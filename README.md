@@ -16,6 +16,21 @@ https://github.com/renoyuan/easyofd/wiki/%E5%85%B3%E4%BA%8EIsuues%E6%8F%90%E4%BA
 
 ### 更新
 
+20260424 - 20260424
+
+1 版本号规则变更（使用日期）
+
+2  新增 DrawParam 参数的继承逻辑 解决部分文件颜色丢失的问题
+
+3 修复多页样本 page tpl  信息合并错误问题
+
+4  新增 页面尺寸检查 去除越界 文本
+
+5 注释存储 
+
+
+
+
 20250901 - v0.5.6
 
 处理annotation_info异常

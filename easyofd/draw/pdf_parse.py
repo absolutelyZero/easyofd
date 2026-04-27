@@ -350,8 +350,8 @@ class ParseFile(PageInfo):
                 contIndex[line_bak["lineId"]] = line_bak
             
             page["contIndex"] = contIndex
-            for line in page['lineList']:
-                print(page_num, line['objType'], line['objContent'])
+            # for line in page['lineList']:
+            #     print(page_num, line['objType'], line['objContent'])
         # 保存至本地
         if self.is_save:
             self.save_result(final_result_list)

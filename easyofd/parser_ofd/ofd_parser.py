@@ -225,6 +225,23 @@ class OFDParser(object):
             img_d["format"] = "jpg"
             img_d["imgb64"] = b64_jpeg
 
+    def _resolve_font(self, text_obj, text):
+        """简单可用版字体 fallback"""
+
+        try:
+            font_name = text_obj.get("@Font", "")
+        except:
+            font_name = ""
+
+        # 如果你有 font_tool，就用你原来的
+        if hasattr(self, "font_tool") and font_name in getattr(self.font_tool, "FONTS", []):
+            return self.font_tool.normalize_font_name(font_name)
+
+        # fallback（关键）
+        if any('\u4e00' <= c <= '\u9fff' for c in text):
+            return "SimSun"   # 中文
+        else:
+            return "Helvetica"  # 英文
     def parser(self, ):
         """
         解析流程
@@ -258,11 +275,12 @@ class OFDParser(object):
 
         # 字体信息
         font_info = {}
+        draw_param_info = {}
         public_res_name: list = doc_root_info.get("public_res")
         if public_res_name:
             public_xml_obj = self.get_xml_obj(public_res_name[0])
-            font_info = PublicResFileParser(public_xml_obj)()
-
+            font_info = PublicResFileParser(public_xml_obj)().get("font", {})
+            draw_param_info = PublicResFileParser(public_xml_obj)().get("drawparams", {})
             # 注册字体
             for font_id, font_v in font_info.items():
                 file_name = font_v.get("FontFile")
@@ -340,9 +358,7 @@ class OFDParser(object):
         annotation_info = {}
         annotations_name: list = doc_root_info.get("Annotations") #获取到入口文件
         logger.debug(f"annotations_name is {annotations_name}")
-        if annotations_name and (annotations_xml_obj:= self.get_xml_obj(annotations_name[0])) : # and False
-            # TODO 注释解析
-            
+        if annotations_name and (annotations_xml_obj:= self.get_xml_obj(annotations_name[0])) : 
             try:
                 annotations_info = AnnotationsParser(annotations_xml_obj)()
                 if annotations_info:
@@ -350,15 +366,17 @@ class OFDParser(object):
                     for page_id, annotations_cell in annotations_info.items():
                         file_loc = annotations_cell.get("FileLoc")
                         anno_page_no = annotations_cell.get("pageNo")
+                        # print(f"annotation page_id {page_id} page_no {anno_page_no} file_loc {file_loc}")
                         if file_loc:
                             annotation_xml_obj = self.get_xml_obj(file_loc)
                             if annotation_xml_obj:
                                 # 解析注释文件
-                                logger.debug(f"annotation_xml_obj is {annotation_xml_obj}")
+                                # logger.debug(f"annotation_xml_obj is {annotation_xml_obj}")
                                 annotation_page_info = AnnotationFileParser(annotation_xml_obj)()
                                 annotation_info[anno_page_no] = annotation_page_info
-                logger.debug(f"annotation_info is {annotation_info}")
+                # logger.info(f"annotation_info is {annotation_info}")
             except Exception as e:
+                traceback.print_exc()
                 logger.error(f"AnnotationFileParser error  {e}")
                 
       
@@ -400,26 +418,39 @@ class OFDParser(object):
                 tpl_xml_obj = self.get_xml_obj(_tpl)
                 tpl_info = ContentFileParser(tpl_xml_obj)()
                 tpl_no = re.search(r"\d+", _tpl)
+                
+                 
 
                 if tpl_no:
                     tpl_no = int(tpl_no.group())
                 else:
                     tpl_no = index
-
+               
                 if tpl_no in page_info_d:
-                    page_info_d[pg_no]["text_list"].extend(tpl_info["text_list"])
-                    page_info_d[pg_no]["text_list"].sort(
+                    # 合并text_list
+                    page_info_d[tpl_no]["text_list"].extend(tpl_info["text_list"])
+                    page_info_d[tpl_no]["text_list"].sort(
                         key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
-                    page_info_d[pg_no]["img_list"].extend(tpl_info["img_list"])
-                    page_info_d[pg_no]["img_list"].sort(
+                    page_info_d[tpl_no]["img_list"].extend(tpl_info["img_list"])
+                    page_info_d[tpl_no]["img_list"].sort(
                         key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
-                    page_info_d[pg_no]["line_list"].extend(tpl_info["line_list"])
-                    page_info_d[pg_no]["line_list"].sort(
+                    page_info_d[tpl_no]["line_list"].extend(tpl_info["line_list"])
+                    page_info_d[tpl_no]["line_list"].sort(
                         key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
                 else:
-                    page_info_d[tpl_no] = tpl_info
-                    page_info_d[tpl_no].sort(
-                        key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
+                    # 新增模板页
+                    # print(f"新增模板页{tpl_no}")
+                    if "text_list" in page_info_d[tpl_no]:
+                        page_info_d[tpl_no]["text_list"].sort(
+                            key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
+                    if "img_list" in page_info_d[tpl_no]:
+                        page_info_d[tpl_no]["img_list"].sort(
+                            key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
+                    if "line_list" in page_info_d[tpl_no]:
+                        page_info_d[tpl_no]["line_list"].sort(
+                            key=lambda pos_text: (float(pos_text.get("pos")[1]), float(pos_text.get("pos")[0])))
+                    
+                    
         docNo = 0  # 没遇到过doc多个的情况 出现再看
         # print("page_info",len(page_info))
         doc_list.append({
@@ -432,6 +463,7 @@ class OFDParser(object):
             "annotation_info": annotation_info,
             "page_id_map": page_id_map,
             "fonts": font_info,
+            "drawparams":draw_param_info,
             "page_info": page_info_d,
             "page_tpl_info": page_info_d,
             "page_content_info": page_info_d,

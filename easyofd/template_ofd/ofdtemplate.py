@@ -440,7 +440,8 @@ class ContentTemplate(TemplateBase):
                             v_cell[targe_key] = self.id_obj.uuid_map[res_uuid]
                             logger.debug(f'{targe_key} >>> {v_cell[targe_key]} -- {res_uuid}')
                         else:
-                            print(f"v_cell {v_cell}")
+                            pass
+                            # print(f"v_cell {v_cell}")
                     pass
                 else:
                     pass

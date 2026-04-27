@@ -60,7 +60,7 @@ class FontTool(object):
         # 字体检测
         logger.debug("FontTool init ,read system default Font ... ")
         self.FONTS = self.get_installed_fonts()
-        logger.debug(f"system default Font is \n{self.FONTS} \n{'-'*50}")
+        # logger.debug(f"system default Font is \n{self.FONTS} \n{'-'*50}")
 
 
     def get_system_font_dirs(self,):

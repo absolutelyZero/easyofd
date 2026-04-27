@@ -85,9 +85,6 @@ class OFD(object):
             mat = fitz.Matrix(zoom_x, zoom_y).prerotate(rotate)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             pil_image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            # image = np.ndarray((pix.height, pix.width, 3), dtype=np.uint8, buffer=pix.samples)
-            # print(image.shape)
-            # print(image[2])
             image_list.append(pil_image)
         logger.info(f"pdf2img")
         return image_list

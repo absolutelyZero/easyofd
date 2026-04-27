@@ -41,7 +41,7 @@ class ContentFileParser(FileParserBase):
         cell_d["size"] = float(row['@Size'])  # 字号
         # print("row", row)
 
-        color = self.ofd_param("ofd:FillColor", row).get("@Value", "0 0 0")
+        color = self.ofd_param("ofd:FillColor", row).get("@Value", "")
 
         cell_d["color"] = tuple(color.split(" "))  # 颜色
         cell_d["DeltaY"] = TextObject.get("@DeltaY", "")  # y 轴偏移量 竖版文字表示方法之一
@@ -74,7 +74,7 @@ class ContentFileParser(FileParserBase):
         text: list = []  # 正文
         text_key = "ofd:TextObject"
         self.recursion_ext(self.xml_obj, text, text_key)
-
+        # print("text===========", text)
         if text:
             for row in text:
                 # print("row", row.get('ofd:TextCode', {}))
@@ -83,12 +83,14 @@ class ContentFileParser(FileParserBase):
                         if not _i.get('#text'):
                             continue
                         cell_d = self.fetch_cell_info(row, _i)
+                        cell_d["DrawParam"] = row.get("@DrawParam", "")  # 画图参数
                         text_list.append(cell_d)
 
                 elif isinstance(row.get('ofd:TextCode', {}), dict):
                     if not row.get('ofd:TextCode', {}).get('#text'):
                         continue
                     cell_d = self.fetch_cell_info(row, row.get('ofd:TextCode', {}))
+                    cell_d["DrawParam"] = row.get("@DrawParam", "") # 画图参数
                     text_list.append(cell_d)
 
                 else:
@@ -109,8 +111,9 @@ class ContentFileParser(FileParserBase):
                     line_d["pos"] = [float(pos_i) for pos_i in _i['@Boundary'].split(" ")]  # 平移矩阵换
                     line_d["LineWidth"] = _i.get("@LineWidth", "")  # 图片id
                     line_d["AbbreviatedData"] = _i.get("ofd:AbbreviatedData", "")  # 路径指令
-                    line_d["FillColor"] = self.ofd_param("ofd:FillColor", _i).get('@Value', "0 0 0").split(" ")  # 颜色
-                    line_d["StrokeColor"] = self.ofd_param("ofd:StrokeColor", _i).get('@Value', "0 0 0")  # 颜色
+                    line_d["FillColor"] = self.ofd_param("ofd:FillColor", _i).get('@Value', "").split(" ")  # 颜色
+                    line_d["StrokeColor"] = self.ofd_param("ofd:StrokeColor", _i).get('@Value', "").split(" ")  # 颜色
+                    line_d["DrawParam"] = _i.get("@DrawParam", "")  # 画图参数
                 except KeyError as e:
                     logger.error(f"{e} \n line is {_i} \n")
                     continue

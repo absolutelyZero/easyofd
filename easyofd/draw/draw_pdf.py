@@ -21,7 +21,7 @@ from easyofd.draw.font_tools import FontTool
 from .find_seal_img import SealExtract
 
 
-# print(reportlab_fonts)
+
 class DrawPDF():
     """
     ofd 解析结果 绘制pdf
@@ -33,7 +33,6 @@ class DrawPDF():
         self.data = data
         self.author = "renoyuan"
         self.OP = 200 / 25.4
-        # self.OP = 1
         self.pdf_uuid_name = self.data[0]["pdf_name"]
         self.pdf_io = BytesIO()
         self.SupportImgType = ("JPG", "JPEG", "PNG")
@@ -84,7 +83,6 @@ class DrawPDF():
             rotate = 0
             move = 0
 
-        # print(f"resize is {resize}")
         char_pos = float(pos if pos else 0) + (float(offset if offset else 0) + move) * resize
         pos_list = []
         pos_list.append(char_pos)  # 放入第一个字符
@@ -105,7 +103,6 @@ class DrawPDF():
                         char_pos += float(offset_i) * resize
                         pos_list.append(char_pos)
                     elif (int(_no) > int(g_no + 2)) and g_no != None:
-                        # print(f"offset_i is {offset_i}")
                         char_pos += float(offset_i) * resize
                         pos_list.append(char_pos)
 
@@ -123,7 +120,120 @@ class DrawPDF():
 
         return pos_list
 
-    def draw_chars(self, canvas, text_list, fonts, page_size):
+    def draw_chars(self, canvas, text_list, fonts, page_size,drawparams):
+        """写入字符"""
+        c = canvas
+        for line_dict in text_list:
+            try:
+                text = line_dict.get("text", "")
+                if not text:
+                    continue
+                    
+                font_info = fonts.get(line_dict.get("font"), {})
+                # 尝试使用系统中可用的中文字体
+                font = "宋体"  # 使用文泉驿微米黑，系统中可用的中文字体
+                # 如果需要，也可以尝试其他中文字体
+                # font = "WenQuanYi Zen Hei"  # 文泉驿正黑
+                
+                try:
+                    c.setFont(font, line_dict["size"] * self.OP)
+                except Exception as e:
+                    import logging
+                    logging.warning(f"字体设置失败，使用默认字体: {e}")
+                    c.setFont("Helvetica", line_dict["size"] * self.OP)
+                    
+                # 原点在页面的左下角 
+                color = line_dict.get("color", ("",)) 
+                
+
+                
+                if len(color) < 3: # 没有颜色信息时 先查看绘图参数 也没有 则默认黑色
+                    DrawParam_id = line_dict.get("DrawParam", "")
+                    if DrawParam_id:
+                        color = drawparams.get(DrawParam_id, {}).get("FillColor", {}).get("value", "")
+                    if not color or len(color) < 3:
+                        color = [0, 0, 0]
+
+                try:
+                    c.setFillColorRGB(int(color[0]) / 255, int(color[1]) / 255, int(color[2]) / 255)
+                    c.setStrokeColorRGB(int(color[0]) / 255, int(color[1]) / 255, int(color[2]) / 255)
+                except:
+                    pass
+
+                DeltaX = line_dict.get("DeltaX", "")
+                DeltaY = line_dict.get("DeltaY", "")
+                X = line_dict.get("X", "")
+                Y = line_dict.get("Y", "")
+                CTM = line_dict.get("CTM", "") 
+                resizeX = 1
+                resizeY = 1
+                
+                CTM_info = {}
+                if CTM and (CTMS:=CTM.split(" ")) and len(CTMS) == 6:
+                    try:
+                        CTM_info = {
+                            "resizeX": float(CTMS[0]),
+                            "rotateX": float(CTMS[1]),
+                            "rotateY": float(CTMS[2]),
+                            "resizeY": float(CTMS[3]),
+                            "moveX": float(CTMS[4]),
+                            "moveY": float(CTMS[5]),
+                        }
+                    except:
+                        pass
+                        
+                try:
+                    x_list = self.cmp_offset(line_dict.get("pos")[0], X, DeltaX, text, CTM_info, dire="X")
+                    y_list = self.cmp_offset(line_dict.get("pos")[1], Y, DeltaY, text, CTM_info, dire="Y")
+                except Exception as e:
+                    import logging
+                    logging.warning(f"计算坐标失败: {e}")
+                    continue
+
+                try:
+                    if len(text) > len(x_list) or len(text) > len(y_list):
+                        import re
+                        text = re.sub("[^\u4e00-\u9fa5]", "", text)
+                    
+                    # 按行写入
+                    if (len(x_list) > 0 and len(y_list) > 0 and 
+                        (y_list[-1] * self.OP > page_size[3] * self.OP or 
+                        x_list[-1] * self.OP > page_size[2] * self.OP or 
+                        x_list[-1] < 0 or y_list[-1] < 0)):
+                        try:
+                            # 跳过超出边界的文本，避免在左上角显示
+                            # 这样可以防止开票人名字出现在左上角
+                            import logging
+                            logging.debug(f"跳过超出边界的文本: {text}")
+                        except Exception as e:
+                            import logging
+                            logging.warning(f"按行写入失败: {e}")
+                    # 检查文本是否为空或只包含空白字符
+                    elif not text or text.isspace():
+                        # 跳过空文本，避免绘制空白内容
+                        import logging
+                        logging.debug(f"跳过空文本")
+                    # 按字符写入
+                    else:
+                        for cahr_id, _cahr_ in enumerate(text):
+                            if len(x_list) > cahr_id and len(y_list) > cahr_id:
+                                try:
+                                    c.setFont(font, line_dict["size"] * self.OP * resizeX)
+                                    _cahr_x = float(x_list[cahr_id]) * self.OP
+                                    _cahr_y = (float(page_size[3]) - (float(y_list[cahr_id]))) * self.OP
+                                    c.drawString(_cahr_x, _cahr_y, _cahr_, mode=0)
+                                except Exception as e:
+                                    import logging
+                                    logging.debug(f"按字符写入失败: {e}")
+                except Exception as e:
+                    import logging
+                    logging.warning(f"文本绘制失败: {e}")
+            except Exception as e:
+                import logging
+                logging.warning(f"处理文本块失败: {e}")
+                # 继续处理下一个文本块，不中断整个流程
+                
+    def draw_chars_old(self, canvas, text_list, fonts, page_size):
         """写入字符"""
         c = canvas
         for line_dict in text_list:
@@ -134,14 +244,12 @@ class DrawPDF():
                 font_name = font_info.get("FontName", "")
             else:
                 font_name = self.init_font
-            # print(f"font_name:{font_name}")
 
             # TODO 判断是否通用已有字体 否则匹配相近字体使用
             if font_name not in self.font_tool.FONTS:
                 font_name = self.font_tool.FONTS[0]
 
             font = self.font_tool.normalize_font_name(font_name)
-            # print(f"font_name:{font_name} font:{font}")
 
             try:
                 c.setFont(font, line_dict["size"] * self.OP)
@@ -281,12 +389,12 @@ class DrawPDF():
             wrap_pos = img_d.get("wrap_pos")
             # wrap_pos = img_d.get("wrap_pos")
             pos = img_d.get('pos')
-            print("pos", pos,"wrap_pos", wrap_pos,"CTM", CTM)
+            # print("pos", pos,"wrap_pos", wrap_pos,"CTM", CTM)
             # CTM =None
             if CTM and not wrap_pos and page_size == pos:
                 x1_new, y1_new, w_new, h_new = self.compute_ctm(CTM, 0, 0, img_width, img_height)
                 pdf_pos = [pos[0] * self.OP, pos[1] * self.OP, pos[2] * self.OP, pos[3] * self.OP]
-                print(f"pos: {pos} pdf_pos: {pdf_pos}")
+                # print(f"pos: {pos} pdf_pos: {pdf_pos}")
 
                 x1_new = (pos[0] + x1_new) * self.OP
                 y1_new = (page_size[3] - y1_new) * self.OP
@@ -311,7 +419,7 @@ class DrawPDF():
                     # print(x, y, w, h)
                     c.drawImage(imgReade, x, y, w, h, 'auto')
                 elif pos:
-                    print(f"page_size == pos :{page_size == pos} ")
+                    # print(f"page_size == pos :{page_size == pos} ")
                     x = pos[0] * self.OP
                     y = (page_size[3] - pos[1]) * self.OP
                     w = pos[2] * self.OP
@@ -473,7 +581,7 @@ class DrawPDF():
                 else:
                     continue
 
-    def draw_line(self, canvas, line_list, page_size):
+    def draw_line(self, canvas, line_list, page_size,drawparams):
         def match_mode(Abbr: list):
             """
             解析AbbreviatedData
@@ -551,8 +659,24 @@ class DrawPDF():
         for line in line_list:
             path = canvas.beginPath()
             Abbr = line.get("AbbreviatedData").split(" ")  # AbbreviatedData
-            color = line.get("FillColor", [0, 0, 0])
-
+            color = line.get("FillColor", "")
+            
+            # 绘图参数
+            draw_param_id = line.get("DrawParam", "")
+            if draw_param_id:
+                d_p_stroke_color = drawparams.get(draw_param_id, {}).get("StrokeColor", {}).get("value", "")
+                d_p_fill_color = drawparams.get(draw_param_id, {}).get("FillColor", {}).get("value", "")
+                d_p_line_width = drawparams.get(draw_param_id, {}).get("LineWidth", {})
+            else:
+                d_p_stroke_color = ""
+                d_p_fill_color = ""
+                d_p_line_width = ""
+                
+            if not color or len(color) < 3:  # 没有颜色信息时 先查看绘图参数 也没有 则默认黑色
+                if d_p_fill_color and len(d_p_fill_color) >= 3:
+                    color = [int(i) for i in d_p_fill_color]
+                else:
+                    color = [0, 0, 0]
             relu_list = match_mode(Abbr)
             # TODO 组合 relu_list 1 M L 直线 2 M B*n 三次贝塞尔线 3 M Q*n 二次贝塞尔线
 
@@ -622,7 +746,7 @@ class DrawPDF():
                         # path.circle(cur_x,cur_y, 20) # 圆
                         path.circle(rx,ry, 20) # 圆 # 莫名其妙的圆
                     else:
-                        print(rx, ry, x2, y2, startAng, large_arc_flag, sweep_flag)
+                        # print(rx, ry, x2, y2, startAng, large_arc_flag, sweep_flag)
                         path.ellipse(rx, ry,20, 20, ) # 椭圆
                     # path.arc(rx, ry, x2, y2, startAng=int(startAng), extent=int(sweep_flag))
                     # path.ellipse(rx, ry,x2, y2, ) # 椭圆
@@ -640,20 +764,189 @@ class DrawPDF():
         写入注释 暂只看到签章图片 有其他的再加入
         """
         img_list = []
-        for key, annotation in annota_info.items():
-            if annotation.get("AnnoType").get("type") == "Stamp":
-                pos = annotation.get("ImgageObject").get("Boundary","").split(" ")
-                pos = [float(i) for i in pos] if pos else []
-                wrap_pos = annotation.get("Appearance").get("Boundary","").split(" ")
-                wrap_pos = [float(i) for i in wrap_pos] if wrap_pos else []
-                CTM = annotation.get("ImgageObject").get("CTM","").split(" ")
-                CTM = [float(i) for i in CTM] if CTM else []
-                img_list.append({
-                    "wrap_pos": wrap_pos,
-                    "pos": pos,
-                    "CTM": CTM,
-                    "ResourceID": annotation.get("ImgageObject").get("ResourceID",""),
-                })
+        for annota_id, annotation in annota_info.items():
+            if annotation.get("AnnoType").get("type") in ["Watermark", "Stamp"]:
+                # print("annotation", annotation)
+                if  annotation.get("ImageObject",{}).get("ID","") and annotation.get("ImageObject",{}).get("ResourceID",""):
+                    logger.debug(f"注释类型: {annotation.get('AnnoType').get('type')}, 资源ID: {annotation.get('ImageObject').get('ResourceID')}")
+                    pos = annotation.get("ImageObject",{}).get("Boundary","").split(" ")
+                    pos = [float(i) for i in pos] if pos else []
+                    wrap_pos = annotation.get("Appearance",{}).get("Boundary","").split(" ")
+                    wrap_pos = [float(i) for i in wrap_pos] if wrap_pos else []
+                    CTM = annotation.get("ImageObject").get("CTM","").split(" ")
+                    CTM = [float(i) for i in CTM] if CTM else []
+                    img_list.append({
+                        "wrap_pos": wrap_pos,
+                        "pos": pos,
+                        "CTM": CTM,
+                        "ResourceID": annotation.get("ImageObject").get("ResourceID",""),
+                    })
+                
+                text_obj = annotation.get("TextObject")
+                
+                if text_obj:
+                    if isinstance(annotation.get("TextObject"), dict):
+                        # print(f"text_obj{'='*100}", text_obj)
+                        try:
+                            # 获取文本内容
+                            text_code = text_obj.get("ofd:TextCode", {})
+                            text = text_code.get("#text", "")
+                            # logger.debug(f"注释文本内容: {text}")
+                            if not text:
+                                continue
+                            
+                            # 获取位置信息
+                            # 使用 Appearance 的 Boundary 作为文本的位置
+                            appearance_boundary = annotation.get("Appearance", {}).get("Boundary", "").split(" ")
+                            if len(appearance_boundary) >= 4:
+                                # 解析 Appearance Boundary: x y width height
+                                # 对于下载次数，使用原始的 x 坐标，不做调整
+                                x = float(appearance_boundary[0]) * self.OP
+                                # 注意：Y 坐标需要考虑文本框的高度，确保文本完整显示
+                                y = (page_size[3] - (float(appearance_boundary[1]) + float(appearance_boundary[3]))) * self.OP
+                            else:
+                                # 如果没有 Appearance Boundary，使用 TextObject 的 Boundary
+                                boundary = text_obj.get("@Boundary", "").split(" ")
+                                if len(boundary) >= 4:
+                                    x = float(boundary[0]) * self.OP
+                                    y = (page_size[3] - float(boundary[1])) * self.OP
+                                else:
+                                    x = 0
+                                    y = 0
+                            
+                            # 获取字体信息
+                            font_size = float(text_obj.get("@Size", 10))
+                            
+                            # 设置字体和大小
+                            try:
+                                canvas.setFont("宋体", font_size * self.OP)
+                            except:
+                                canvas.setFont("宋体", font_size * self.OP)
+                            
+                            # 设置文本颜色为黑色
+                            canvas.setFillColorRGB(0, 0, 0)
+                            canvas.setStrokeColorRGB(0, 0, 0)
+                            
+                            # 处理 CTM 矩阵，支持旋转
+                            ctm = text_obj.get("@CTM", "").split(" ")
+                            if len(ctm) == 6:
+                                try:
+                                    a, b, ctm_c, d, e, f = [float(i) for i in ctm]
+                                    # 保存当前状态
+                                    canvas.saveState()
+                                    
+                                    # 应用 CTM 变换
+                                    # 注意：CTM 矩阵 [0, 1, -1, 0] 是逆时针90度旋转
+                                    # 在屏幕坐标系中，这会看起来是顺时针
+                                    # 但用户反馈方向相反，需要再旋转180度
+                                    canvas.transform(a, b, ctm_c, d, x + e * self.OP, y + f * self.OP)
+                                    
+                                    # 再旋转180度，修正文字方向
+                                    canvas.rotate(180)
+                                    
+                                    # 调整文本位置，确保旋转后文字在正确的位置
+                                    # 计算文本大小
+                                    text_height = font_size * self.OP
+                                    text_width = text_height * len(text)
+                                    canvas.translate(-text_width, -text_height)
+                                    
+                                    # 绘制文本
+                                    canvas.drawString(0, 0, text)
+                                    
+                                    # 恢复状态
+                                    canvas.restoreState()
+                                except Exception as e:
+                                    import logging
+                                    logging.warning(f"处理 CTM 变换失败: {e}")
+                                    # 如果 CTM 处理失败，使用默认位置
+                                    canvas.drawString(x, y, text)
+                            else:
+                                # 没有 CTM 信息，使用默认位置
+                                canvas.drawString(x, y, text)
+                        except Exception as e:
+                            logger.warning(f"处理文本对象失败: {e}")
+                            traceback.print_exc()
+                    elif isinstance(annotation.get("TextObject"), list):
+                        for text_obj in annotation.get("TextObject"):
+                            try:
+                                # 获取文本内容
+                                text_code = text_obj.get("ofd:TextCode", {})
+                                text = text_code.get("#text", "")
+                                # logger.debug(f"注释文本内容: {text}")
+                                if not text:
+                                    continue
+                                
+                                # 获取位置信息
+                                # 使用 Appearance 的 Boundary 作为文本的位置
+                                appearance_boundary = annotation.get("Appearance", {}).get("Boundary", "").split(" ")
+                                if len(appearance_boundary) >= 4:
+                                    # 解析 Appearance Boundary: x y width height
+                                    # 对于下载次数，使用原始的 x 坐标，不做调整
+                                    x = float(appearance_boundary[0]) * self.OP
+                                    # 注意：Y 坐标需要考虑文本框的高度，确保文本完整显示
+                                    y = (page_size[3] - (float(appearance_boundary[1]) + float(appearance_boundary[3]))) * self.OP
+                                else:
+                                    # 如果没有 Appearance Boundary，使用 TextObject 的 Boundary
+                                    boundary = text_obj.get("@Boundary", "").split(" ")
+                                    if len(boundary) >= 4:
+                                        x = float(boundary[0]) * self.OP
+                                        y = (page_size[3] - float(boundary[1])) * self.OP
+                                    else:
+                                        x = 0
+                                        y = 0
+                                
+                                # 获取字体信息
+                                font_size = float(text_obj.get("@Size", 10))
+                                
+                                # 设置字体和大小
+                                try:
+                                    canvas.setFont("宋体", font_size * self.OP)
+                                except:
+                                    canvas.setFont("宋体", font_size * self.OP)
+                                
+                                # 设置文本颜色为黑色
+                                canvas.setFillColorRGB(0, 0, 0)
+                                canvas.setStrokeColorRGB(0, 0, 0)
+                                
+                                # 处理 CTM 矩阵，支持旋转
+                                ctm = text_obj.get("@CTM", "").split(" ")
+                                if len(ctm) == 6:
+                                    try:
+                                        a, b, ctm_c, d, e, f = [float(i) for i in ctm]
+                                        # 保存当前状态
+                                        canvas.saveState()
+                                        
+                                        # 应用 CTM 变换
+                                        # 注意：CTM 矩阵 [0, 1, -1, 0] 是逆时针90度旋转
+                                        # 在屏幕坐标系中，这会看起来是顺时针
+                                        # 但用户反馈方向相反，需要再旋转180度
+                                        canvas.transform(a, b, ctm_c, d, x + e * self.OP, y + f * self.OP)
+                                        
+                                        # 再旋转180度，修正文字方向
+                                        canvas.rotate(180)
+                                        
+                                        # 调整文本位置，确保旋转后文字在正确的位置
+                                        # 计算文本大小
+                                        text_height = font_size * self.OP
+                                        text_width = text_height * len(text)
+                                        canvas.translate(-text_width, -text_height)
+                                        
+                                        # 绘制文本
+                                        canvas.drawString(0, 0, text)
+                                        
+                                        # 恢复状态
+                                        canvas.restoreState()
+                                    except Exception as e:
+                                        import logging
+                                        logging.warning(f"处理 CTM 变换失败: {e}")
+                                        # 如果 CTM 处理失败，使用默认位置
+                                        canvas.drawString(x, y, text)
+                                else:
+                                    # 没有 CTM 信息，使用默认位置
+                                    canvas.drawString(x, y, text)
+                            except Exception as e:
+                                logger.warning(f"处理文本对象失败: {e}")
+                                traceback.print_exc()
         self.draw_img( canvas, img_list, images, page_size)
         
     def draw_pdf(self):
@@ -667,7 +960,8 @@ class DrawPDF():
             images = doc.get("images")
             default_page_size = doc.get("default_page_size")
             page_size_details = doc.get("page_size")
-            print("page_size_details", page_size_details)
+            drawparams = doc.get("drawparams")
+            # print("page_size_details", page_size_details)
             signatures_page_id = doc.get("signatures_page_id")  # 签证信息
             annotation_info = doc.get("annotation_info")  # 注释信息
 
@@ -677,10 +971,11 @@ class DrawPDF():
                 font_b64 = font_v.get("font_b64")
                 if font_b64:
                     self.font_tool.register_font(os.path.split(file_name)[1], font_v.get("@FontName"), font_b64)
-            # text_write = []
-            # print("doc.get(page_info)", len(doc.get("page_info")))
+    
             for pg_no, page in doc.get("page_info").items():
-                print(f"pg_no: {pg_no} page_size_details: {page_size_details}")
+            
+                # print(f"正在写入文档{doc_id}的第{pg_no}页{page}")
+                # print(f"pg_no: {pg_no} page_size_details: {page_size_details}")
                 if len(page_size_details) > pg_no and page_size_details[pg_no]:
                     page_size = page_size_details[pg_no]
                 else:
@@ -699,16 +994,16 @@ class DrawPDF():
 
                 # 写入文本
                 if text_list:
-
-                    self.draw_chars(c, text_list, fonts, page_size)
+                    self.draw_chars(c, text_list, fonts, page_size,drawparams)
 
                 # 绘制线条
                 if line_list:
-                    self.draw_line(c, line_list, page_size)
+                    self.draw_line(c, line_list, page_size,drawparams)
 
                 # 绘制签章
                 if signatures_page_id:
                     self.draw_signature(c, signatures_page_id.get(pg_no), page_size)
+                    
                 # 绘制注释
                 if annotation_info and pg_no in annotation_info:
                     self.draw_annotation(c, annotation_info.get(pg_no),images, page_size)

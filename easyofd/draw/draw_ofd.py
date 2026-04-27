@@ -256,7 +256,7 @@ class OFDWrite(object):
 
             res_static = {}  # 图片资源
 
-            print("pfd_res_uuid_map", pfd_res_uuid_map)
+            # print("pfd_res_uuid_map", pfd_res_uuid_map)
             img_dict = pfd_res_uuid_map.get("img")
             if img_dict:
                 for key, v_io in img_dict.items():

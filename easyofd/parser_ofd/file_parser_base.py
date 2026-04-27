@@ -26,9 +26,8 @@ class FileParserBase(object):
         assert xml_obj
         self.ofd_param = ParameterParser()
         self.xml_obj = xml_obj
-        # print(xml_obj)
 
-    def recursion_ext(self, need_ext_obj, ext_list, key):
+    def recursion_ext(self, need_ext_obj, ext_list, key, parent_draw_param=""):
         """
         抽取需要xml要素
         need_ext_obj : xmltree
@@ -37,23 +36,29 @@ class FileParserBase(object):
         """
 
         if isinstance(need_ext_obj, dict):
-
+            current_draw_param = need_ext_obj.get("@DrawParam", parent_draw_param)
+            need_ext_obj["@DrawParam"] = current_draw_param
             for k, v in need_ext_obj.items():
                 if k == key:
 
                     if isinstance(v, (dict, str)):
+                        if "@DrawParam" not in v and current_draw_param :
+                            v["@DrawParam"] = current_draw_param
                         ext_list.append(v)
                     elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict):
+                                if "@DrawParam" not in item and current_draw_param is not None:
+                                    item["@DrawParam"] = current_draw_param
+                        
                         ext_list.extend(v)
-
-
                 else:
 
                     if isinstance(v, dict):
-                        self.recursion_ext(v, ext_list, key)
+                        self.recursion_ext(v, ext_list, key, parent_draw_param=current_draw_param)
                     elif isinstance(v, list):
                         for cell in v:
-                            self.recursion_ext(cell, ext_list, key)
+                            self.recursion_ext(cell, ext_list, key, parent_draw_param=current_draw_param)
                     else:
 
                         pass

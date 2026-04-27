@@ -10,7 +10,10 @@ from .file_parser_base import FileParserBase
 
 class PublicResFileParser(FileParserBase):
     """
-    Parser PublicRes 抽取里面 获取公共信息 字体信息
+    Parser PublicRes 抽取里面 获取公共信息
+    字体信息 ofd:Font
+    绘制参数信息 ofd:DrawParams
+    
     /xml_dir/Doc_0/PublicRes.xml
     """
 
@@ -31,14 +34,17 @@ class PublicResFileParser(FileParserBase):
         return normalized
 
     def __call__(self):
-        info = {}
-        public_res: list = []
-        public_res_key = "ofd:Font"
-        self.recursion_ext(self.xml_obj, public_res, public_res_key)
+        info = {"font": {}, "drawparams": {}}
+        public_res_font: list = []
+        public_res_drawparams: list = []
+        public_res_font_key = "ofd:Font"
+        public_res_drawparams_key = "ofd:DrawParam"
+        self.recursion_ext(self.xml_obj, public_res_font, public_res_font_key)
+        self.recursion_ext(self.xml_obj, public_res_drawparams, public_res_drawparams_key)
 
-        if public_res:
-            for i in public_res:
-                info[i.get("@ID")] = {
+        if public_res_font:
+            for i in public_res_font:
+                info["font"][i.get("@ID")] = {
                     "FontName": self.normalize_font_name(i.get("@FontName")),
                     "FontNameORI": i.get("@FontName"),
                     "FamilyName": self.normalize_font_name(i.get("@FamilyName")),
@@ -48,5 +54,22 @@ class PublicResFileParser(FileParserBase):
                     "FixedWidth": i.get("@FixedWidth"),
                     "FontFile": i.get("ofd:FontFile"),
                 }
+        print("public_res_drawparam", public_res_drawparams)
+        if public_res_drawparams:
+            for i in public_res_drawparams:
+                info["drawparams"][i.get("@ID")] = {
+                    
+                    "LineWidth": i.get("@LineWidth"),
+                    
+                    "StrokeColor":{
+                        "value":i.get("ofd:StrokeColor", {}).get('@Value', "").split(" "),
+                        "color_space": i.get("ofd:StrokeColor", {}).get('@ColorSpace', "0"),
+                            },
+                    "FillColor":{
+                        "value":i.get("ofd:FillColor", {}).get('@Value', "").split(" "),
+                        "color_space": i.get("ofd:FillColor", {}).get('@ColorSpace', "0"),    
+                            }
+                    }
+                    
         return info
 
