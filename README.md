@@ -16,7 +16,7 @@ https://github.com/renoyuan/easyofd/wiki/%E5%85%B3%E4%BA%8EIsuues%E6%8F%90%E4%BA
 
 ### 更新
 
-20260424 - 20260424
+20260427 - 20260427
 
 1 版本号规则变更（使用日期）
 
@@ -26,7 +26,11 @@ https://github.com/renoyuan/easyofd/wiki/%E5%85%B3%E4%BA%8EIsuues%E6%8F%90%E4%BA
 
 4  新增 页面尺寸检查 去除越界 文本
 
-5 注释存储 
+5 Annot注释存储的 ImageObject 丢失问题
+
+6 增加 Annot中对TextObject的解析以及pdf中的绘制
+
+感谢@[Xtaiyang](https://github.com/Xtaiyang) 对于 4 5 6 提供的代码
 
 
 
