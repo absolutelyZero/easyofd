@@ -19,18 +19,16 @@ OFD
        └── DocRoot
        
 """
-class FileBase: 
-    pass
+
+        
 
 
-# 14. OFD 总文件
-class OFDFile(FileBase):
-    def __init__(self):
-        self.documents = [] # List<Document>
+
         
 # 13. 文档
 class Document(FileBase):
-    def __init__(self):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
         self.pages = []          # List<Page>
         self.fonts = []         # List<Font>
         self.medias = []        # List<MultiMedia>

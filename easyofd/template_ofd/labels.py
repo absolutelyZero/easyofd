@@ -7,10 +7,15 @@ E_MAIL: renoyuan@foxmail.com
 AUTHOR: reno 
 note:  label
 """
-class LabelBase:
+
+
+class DocBody(LabelBase):
     def __init__(self):
-        self.id = ""
         self.value = ""
+        self.doc_info = DocInfo()
+        self.doc_root = DocRoot()
+        self.doc_root_link = DocRootLink()
+        
 
 # 万能文本节点：自带标签名 + 值
 class TextNodeLabel(LabelBase):
@@ -18,11 +23,7 @@ class TextNodeLabel(LabelBase):
         self.tag = tag    # 标签名：DocID, Author, CreationDate...
         self.text = text  # 文本内容
         
-class OFDLabel(LabelBase):
-    def __init__(self):
-        self.doc_type = "OFD"    # DocType 属性
-        self.version = "renoyuan"     # Version 属性
-        self.doc_body = DocBody()# <ofd:DocBody>
+
 
 class DocInfoLabel(LabelBase):
     def __init__(self):

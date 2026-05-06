@@ -86,7 +86,7 @@ def test_pdf2(file_path):
 
 if __name__ == "__main__":
 
-    file_path = rf"F:\ofdfile\20251110\1.ofd"
+    file_path = rf"F:\ofdfile\20260421\26952000001237378936.ofd"
     # file_path = r"data/2.ofd"
     if sys.argv[1] == "ofd2":
         test_ofd2(file_path)
